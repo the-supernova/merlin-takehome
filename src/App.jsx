@@ -23,6 +23,7 @@ function App() {
   const [data, setData] = useState(text);
   const [responses, setResponses] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
+  const [hasEntered, setHasEntered] = useState(false);
 
   const pRef = useRef();
 
@@ -55,27 +56,55 @@ function App() {
 
   const handleRefresh = () => {
     if (input.length) {
-      streamData();
+      setHasEntered(true);
     }
   };
 
   const handleEnter = (e) => {
     if (e.key === "Enter" && input.length) {
-      streamData();
+      setHasEntered(true);
     }
   };
 
   const handlePrev = () => {
     setCurrentIdx(currentIdx - 1);
-    console.log(responses[currentIdx - 1], currentIdx);
+    //console.log(responses[currentIdx - 1], currentIdx);
     setData(responses[currentIdx - 1]);
   };
 
   const handleNext = () => {
     setCurrentIdx(currentIdx + 1);
-    console.log(responses[currentIdx - 1], currentIdx);
+    //console.log(responses[currentIdx - 1], currentIdx);
     setData(responses[currentIdx - 1]);
   };
+
+  useEffect(() => {
+    if (hasEntered && input) {
+      setData("");
+      let eventSource,
+        response = "";
+      eventSource = new EventSource(
+        "https://take-home-endpoints-yak3s7dv3a-el.a.run.app/sse"
+      );
+
+      eventSource.onmessage = (event) => {
+        const parsedData = JSON.parse(event.data);
+        const text = parsedData.choices[0].text;
+        response += text;
+        setData((prevData) => prevData + text);
+
+        if (parsedData.choices[0].finish_reason === "stop") {
+          setHasEntered(false);
+          setResponses([...responses, response]);
+          setCurrentIdx((currentIdx) => currentIdx + 1);
+          eventSource.close();
+        }
+      };
+      return () => {
+        if (eventSource) eventSource.close();
+      };
+    }
+  }, [hasEntered]);
 
   return (
     <div className="w-full h-full md:px-[20%] px-5">
